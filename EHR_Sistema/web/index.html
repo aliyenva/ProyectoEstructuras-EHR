@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EHR · Plataforma de Salud Digital</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ═══ Barra superior: navegación + estado de conexión ═══ -->
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="9" y="2" width="6" height="20" rx="2" fill="#fff"/><rect x="2" y="9" width="20" height="6" rx="2" fill="#fff"/></svg>
+    <div><strong>EHR Salud Digital</strong><small>Estructuras de Datos II</small></div>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="gestion">Gestión clínica</button>
+    <button class="tab-btn" data-tab="triaje">Triaje <span class="count" id="cnt-triaje">0</span></button>
+    <button class="tab-btn" data-tab="estructuras">Estructuras de datos</button>
+  </nav>
+
+  <div class="status" id="status">
+    <span class="chip" id="chip-backend"><i class="dot"></i><span>Backend C++</span></span>
+    <span class="chip" id="chip-mongo"><i class="dot"></i><span>MongoDB</span></span>
+    <button class="btn-ghost" id="btn-reconectar" title="Reintentar conexión con MongoDB">Reconectar</button>
+    <button class="btn-ghost" id="btn-log" title="Mostrar/ocultar bitácora de peticiones">Bitácora</button>
+  </div>
+</header>
+
+<div class="ticker" id="ticker">Esperando actividad…</div>
+
+<main>
+
+  <!-- ═══════════════ GESTIÓN CLÍNICA ═══════════════ -->
+  <section id="tab-gestion" class="tab active">
+    <div class="grid-gestion">
+
+      <!-- Formulario -->
+      <form class="card" id="form-paciente" autocomplete="off">
+        <div class="card-head">
+          <h2 id="form-titulo">Nuevo paciente</h2>
+          <button type="button" class="btn-link hidden" id="btn-cancelar-edicion">Cancelar edición</button>
+        </div>
+
+        <div class="fields">
+          <label>ID paciente
+            <input id="f-id" required maxlength="40" placeholder="P013 / DNI / QR">
+          </label>
+          <label class="span2">Nombre completo
+            <input id="f-nombre" required maxlength="80">
+          </label>
+          <label>Edad
+            <input id="f-edad" type="number" min="0" max="130" value="0">
+          </label>
+          <label>Tipo de sangre
+            <select id="f-sangre">
+              <option>O+</option><option>O-</option><option>A+</option><option>A-</option>
+              <option>B+</option><option>B-</option><option>AB+</option><option>AB-</option>
+            </select>
+          </label>
+          <label class="span2">Diagnóstico
+            <input id="f-diag" maxlength="160" placeholder="Ej. Sepsis de origen pulmonar">
+          </label>
+          <label class="span2">Alergias <small>(separadas por coma)</small>
+            <input id="f-alergias" placeholder="penicilina, aspirina">
+          </label>
+          <label>Nivel de triaje
+            <select id="f-triage">
+              <option value="1">1 · Crítico</option>
+              <option value="2">2 · Emergencia</option>
+              <option value="3">3 · Urgente</option>
+              <option value="4">4 · Menos urgente</option>
+              <option value="5" selected>5 · No urgente</option>
+            </select>
+          </label>
+          <label class="check"><input id="f-uci" type="checkbox"> Ingresa a UCI <small>(se indexa en el árbol Rojo-Negro)</small></label>
+        </div>
+
+        <!-- SOFA automático -->
+        <fieldset class="sofa">
+          <legend>Parámetros clínicos · el SOFA se calcula solo</legend>
+          <label class="check hidden" id="row-usar-params">
+            <input id="f-usar-params" type="checkbox">
+            <span>Calcular SOFA con estos parámetros <small id="sofa-manual-nota"></small></span>
+          </label>
+          <div class="sofa-grid" id="sofa-grid">
+            <label>PaO₂/FiO₂ <small>mmHg</small><input id="s-pao2fio2" type="number" step="any" value="400"></label>
+            <label class="check inline"><input id="s-ventilado" type="checkbox"> Ventilación mecánica</label>
+            <label>Plaquetas <small>×10³/µL</small><input id="s-plaquetas" type="number" step="any" value="200"></label>
+            <label>Bilirrubina <small>mg/dL</small><input id="s-bilirrubina" type="number" step="any" value="0.5"></label>
+            <label>PAM <small>mmHg</small><input id="s-pam" type="number" step="any" value="80"></label>
+            <label>Vasopresor
+              <select id="s-vasopresor">
+                <option value="0">Ninguno</option>
+                <option value="1">Dopamina ≤5 / dobutamina</option>
+                <option value="2">Dopamina &gt;5 / adr-nor ≤0.1</option>
+                <option value="3">Dopamina &gt;15 / adr-nor &gt;0.1</option>
+              </select>
+            </label>
+            <label>Glasgow <small>3–15</small><input id="s-glasgow" type="number" min="3" max="15" value="15"></label>
+            <label>Creatinina <small>mg/dL</small><input id="s-creatinina" type="number" step="any" value="0.8"></label>
+          </div>
+
+          <div class="sofa-result">
+            <div class="sofa-total"><span id="sofa-total">0</span><small>SOFA / 24</small></div>
+            <div class="sofa-bars" id="sofa-bars"></div>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button class="btn-primary" type="submit" id="btn-guardar">Registrar paciente</button>
+          <button class="btn-secondary" type="button" id="btn-limpiar">Limpiar</button>
+        </div>
+        <div class="trace hidden" id="trace-form"></div>
+      </form>
+
+      <!-- Buscador + tabla -->
+      <div class="col">
+        <div class="card">
+          <div class="card-head"><h2>Buscar expediente</h2></div>
+          <div class="search-row">
+            <input id="q" type="search" placeholder="Escriba un ID exacto para buscar, o parte del nombre / diagnóstico para filtrar…">
+          </div>
+          <div class="via-row">
+            <span>Resolver búsqueda por ID mediante:</span>
+            <label class="radio"><input type="radio" name="via" value="hash" checked> Tabla Hash <small>O(1)</small></label>
+            <label class="radio"><input type="radio" name="via" value="arbol"> Árbol Rojo-Negro <small>solo UCI</small></label>
+            <label class="sofa-clave hidden" id="lbl-sofa-clave">SOFA (clave) <input id="q-sofa" type="number" step="any" placeholder="opcional → O(log n)"></label>
+          </div>
+          <div id="resultado-busqueda" class="resultado hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Expedientes <span class="muted" id="cnt-pacientes"></span></h2>
+            <button class="btn-link" id="btn-refrescar">Actualizar</button>
+          </div>
+          <div class="table-wrap">
+            <table id="tabla-pacientes">
+              <thead><tr>
+                <th>ID</th><th>Nombre</th><th>Edad</th><th>Triaje</th><th>SOFA</th><th>UCI</th><th>Diagnóstico</th><th></th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ TRIAJE ═══════════════ -->
+  <section id="tab-triaje" class="tab">
+    <div class="grid-triaje">
+      <div class="col">
+        <div class="card" id="card-siguiente">
+          <div class="card-head"><h2>Siguiente a atender</h2><span class="badge-heap">Max-Heap · raíz O(1)</span></div>
+          <div id="siguiente"></div>
+          <button class="btn-danger big" id="btn-despachar">Despachar paciente más urgente</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Flujo de despacho</h2></div>
+          <ol class="flow" id="flow"><li class="muted">Sin despachos todavía.</li></ol>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Cola de urgencias</h2>
+          <span class="muted" id="triage-info"></span>
+        </div>
+        <p class="hint">Orden de atención: nivel de triaje (1 primero), luego mayor SOFA, luego ID. Cambie el nivel de un paciente para ver cómo se reubica en el heap.</p>
+        <div class="table-wrap">
+          <table id="tabla-triaje">
+            <thead><tr><th>Orden</th><th>Pos. heap</th><th>ID</th><th>Paciente</th><th>Nivel</th><th>SOFA</th><th>UCI</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ ESTRUCTURAS ═══════════════ -->
+  <section id="tab-estructuras" class="tab">
+    <div class="subtabs" id="subtabs">
+      <button class="sub-btn active" data-sub="arbol">Árbol Rojo-Negro</button>
+      <button class="sub-btn" data-sub="hash">Tabla Hash lineal</button>
+      <button class="sub-btn" data-sub="heap">Max-Heap</button>
+      <button class="sub-btn" data-sub="grafo">Grafo de derivaciones</button>
+    </div>
+
+    <div class="sub active" id="sub-arbol">
+      <div class="card">
+        <div class="card-head"><h2>Árbol Rojo-Negro · pacientes en UCI</h2><div class="stats" id="arbol-stats"></div></div>
+        <div class="toolbar">
+          <button class="btn-secondary" data-recorrido="inorden">Inorden</button>
+          <button class="btn-secondary" data-recorrido="preorden">Preorden</button>
+          <button class="btn-secondary" data-recorrido="postorden">Postorden</button>
+          <span class="legend"><i class="lg red"></i>Rojo <i class="lg black"></i>Negro <i class="lg ring"></i>Cambió en la última operación</span>
+        </div>
+        <div class="recorrido" id="arbol-recorrido"></div>
+        <div class="svg-wrap" id="arbol-svg"></div>
+        <div class="node-info" id="arbol-info">Haga clic en un nodo para ver sus detalles.</div>
+      </div>
+    </div>
+
+    <div class="sub" id="sub-hash">
+      <div class="card">
+        <div class="card-head"><h2>Tabla Hash lineal · todos los pacientes</h2></div>
+        <div class="stats-grid" id="hash-stats"></div>
+        <div class="banner hidden" id="hash-banner"></div>
+        <div id="hash-buckets" class="buckets"></div>
+      </div>
+    </div>
+
+    <div class="sub" id="sub-heap">
+      <div class="card">
+        <div class="card-head"><h2>Max-Heap · cola de triaje</h2><div class="stats" id="heap-stats"></div></div>
+        <div class="banner hidden" id="heap-mov"></div>
+        <div class="svg-wrap" id="heap-svg"></div>
+        <h3>Arreglo</h3>
+        <div class="array" id="heap-array"></div>
+        <div class="toolbar sim">
+          <strong>Simular cambio de gravedad:</strong>
+          <select id="sim-paciente"></select>
+          <select id="sim-nivel">
+            <option value="1">Nivel 1</option><option value="2">Nivel 2</option><option value="3">Nivel 3</option>
+            <option value="4">Nivel 4</option><option value="5">Nivel 5</option>
+          </select>
+          <button class="btn-primary" id="sim-aplicar">Aplicar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub" id="sub-grafo">
+      <div class="grid-grafo">
+        <div class="card">
+          <div class="card-head"><h2>Red de derivaciones</h2><div class="stats" id="grafo-stats"></div></div>
+          <div class="toolbar">
+            <span class="legend"><i class="lg hosp"></i>Hospital <i class="lg cent"></i>Centro <i class="lg esp"></i>Especialista</span>
+          </div>
+          <div class="svg-wrap" id="grafo-svg"></div>
+          <div class="node-info" id="grafo-info">Haga clic en un nodo o en el tiempo de una arista para seleccionarlo.</div>
+        </div>
+
+        <div class="col">
+          <div class="card">
+            <div class="card-head"><h3>Agregar nodo</h3></div>
+            <form class="mini-form" id="form-nodo">
+              <input id="gn-id" placeholder="ID (ej. H-ESTE)" required>
+              <input id="gn-nombre" placeholder="Nombre" required>
+              <select id="gn-tipo"><option value="hospital">Hospital</option><option value="centro">Centro</option><option value="especialista">Especialista</option></select>
+              <button class="btn-primary">Agregar</button>
+            </form>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Conectar (derivación)</h3></div>
+            <form class="mini-form" id="form-arista">
+              <select id="ga-de"></select>
+              <select id="ga-a"></select>
+              <input id="ga-min" type="number" min="0" placeholder="Minutos" required>
+              <input id="ga-motivo" placeholder="Motivo">
+              <button class="btn-primary">Conectar</button>
+            </form>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Ruta más corta</h3></div>
+            <form class="mini-form" id="form-ruta">
+              <select id="gr-de"></select>
+              <select id="gr-a"></select>
+              <button class="btn-secondary">Calcular (Dijkstra)</button>
+            </form>
+            <div class="muted small" id="ruta-resultado"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Derivar paciente</h3></div>
+            <form class="mini-form" id="form-derivar">
+              <select id="gd-paciente"></select>
+              <select id="gd-de"></select>
+              <select id="gd-a"></select>
+              <input id="gd-motivo" placeholder="Motivo">
+              <button class="btn-primary">Derivar</button>
+            </form>
+            <ul class="deriv-list" id="deriv-list"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Bitácora de peticiones -->
+<aside class="logpanel hidden" id="log-panel">
+  <div class="log-head"><strong>Bitácora de peticiones y sincronización</strong><button class="btn-link" id="btn-log-cerrar">Cerrar</button></div>
+  <div class="log-body" id="log-body"></div>
+</aside>
+
+<div id="toasts"></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Binarios y compilación
+EHR_Sistema/build/
+*.exe
+*.o
+
+# Editor / sistema
+.vscode/
+Thumbs.db

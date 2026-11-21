@@ -1,0 +1,13 @@
+idPaciente,nombre,tipoSangre,nivelTriage,scoreSOFA,enUCI,alergias
+P001,Maria Gonzalez,O+,1,18.5,true,"penicilina;aspirina"
+P002,Carlos Mendoza,A-,2,12.0,true,"sulfonamidas"
+P003,Ana Ramirez,B+,3,6.5,false,""
+P004,Luis Torres,AB+,2,14.2,true,"ibuprofeno;morfina"
+P005,Sofia Vargas,O-,4,2.1,false,""
+P006,Diego Morales,A+,1,20.8,true,"penicilina"
+P007,Valentina Ruiz,B-,3,5.0,false,"latex"
+P008,Andres Perez,O+,5,0.5,false,""
+P009,Daniela Castro,A+,2,11.3,true,"codeina"
+P010,Fernando Herrera,AB-,4,3.2,false,""
+P011,Gabriela Lopez,O+,1,22.1,true,"penicilina;cefalosporinas"
+P012,Roberto Silva,A-,3,7.8,false,""
