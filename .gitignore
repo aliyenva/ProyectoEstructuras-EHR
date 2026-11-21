@@ -6,3 +6,6 @@ EHR_Sistema/build/
 # Editor / sistema
 .vscode/
 Thumbs.db
+
+# Specs de Kiro
+.kiro/
